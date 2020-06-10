@@ -1,10 +1,13 @@
-# elephant-server
+# Elephant Server
 A server for Elephant (Electrophysiology Analysis Toolkit)
+
 
 The API server provides a direct access to Elephant functionalities through GET/POST requests.
 
-The basic functional is `<hostname>/api/<module>/<call>`
+The basic functional of the request url to Elephant Server is `<hostname>/api/<module>/<call>`
 
+
+For more information of the Elephant: https://github.com/NeuralEnsemble/elephant
 
 ### Installation
 

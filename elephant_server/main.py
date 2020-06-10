@@ -97,7 +97,7 @@ def get_or_error(func):
     return func_wrapper
 
 
-def to_spiketrain(arg):
+def to_spike_train(arg):
     if isinstance(arg, (list,tuple)):
         try:
             return neo.SpikeTrain(*arg)
@@ -123,9 +123,9 @@ def serialize(call, args, kwargs):
         if paramKeys[idx] == 'signal':
             args[idx] = to_analog_signal(arg)
         elif paramKeys[idx] == 'spiketrain':
-            args[idx] = to_spiketrain(arg)
+            args[idx] = to_spike_train(arg)
         elif paramKeys[idx] == 'spiketrains':
-            args[idx] = [to_spiketrain(a) for a in arg]
+            args[idx] = [to_spike_train(a) for a in arg]
         elif paramKeys[idx] in ['binsize', 't_start', 't_stop']:
             args[idx] = arg['value'] * getattr(pq, arg['unit'])
 
@@ -133,9 +133,9 @@ def serialize(call, args, kwargs):
         if key == 'signal':
             kwargs[key] = to_analog_signal(value)
         if key == 'spiketrain':
-            kwargs[key] = to_spiketrain(value)
+            kwargs[key] = to_spike_train(value)
         elif key == 'spiketrains':
-            kwargs[key] = [to_spiketrain(v) for v in value]
+            kwargs[key] = [to_spike_train(v) for v in value]
         elif key in ['binsize', 't_start', 't_stop']:
             kwargs[key] = value['value'] * getattr(pq, value['unit'])
     return args, kwargs

@@ -43,6 +43,11 @@ Using curl in bash
 curl localhost:5000/api/<module>/<call>
 ```
 
+E.g. To see a list of calls in statistucs module
+```
+curl localhost:5000/api/statistics
+```
+
 Using requests in Python (`ipython`)
 ```
 import requests

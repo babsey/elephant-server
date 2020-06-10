@@ -1,37 +1,20 @@
-import inspect
-
 import flask
 from flask import Flask, request, jsonify
 from flask_cors import CORS, cross_origin
+
+import inspect
 
 from werkzeug.exceptions import abort
 from werkzeug.wrappers import Response
 
 import elephant
+import neo
 import numpy as np
 import quantities as pq
 
 
 __all__ = [
     'app'
-]
-
-
-# Blacklist of modules according to Bandit (https://bandit.readthedocs.io).
-_blacklist_modules = [
-    'commands',
-    'dsa',
-    'jinja2',
-    'mako',
-    'os',
-    'paramiko',
-    'popen2',
-    'requests',
-    'rsa',
-    'socket',
-    'ssl',
-    'subprocess',
-    'sys',
 ]
 
 
@@ -43,34 +26,6 @@ CORS(app)
 def index():
     return jsonify({'elephant': elephant.__version__})
 
-
-@app.route('/exec', methods=['GET', 'POST'])
-@cross_origin()
-def route_exec():
-    """ Route to execute script in Python.
-    """
-    try:
-        args, kwargs = get_arguments(request)
-        source_code = kwargs.get('source', '')
-        source_cleaned = clean_code(source_code)
-        byte_code = compile_restricted(source_cleaned, '<inline>', 'exec')
-        locals = get_modules(source_code)
-        with Capturing() as stdout:
-            exec(byte_code, safe_globals, locals)
-        response = {
-            'stdout': '\n'.join(stdout),
-        }
-        if 'return' in kwargs:
-            if isinstance(kwargs['return'], list):
-                data = {}
-                for variable in kwargs['return']:
-                    data[variable] = locals.get(variable, None)
-            else:
-                data = locals.get(kwargs['return'], None)
-            response['data'] = serializable(data)
-        return jsonify(response)
-    except Exception as e:
-        abort(Response(str(e), 400))
 
 # --------------------------
 # RESTful API
@@ -106,26 +61,6 @@ def route_api_call(module, call):
 # Helpers for the server
 # ----------------------
 
-class Capturing(list):
-    """ Monitor stdout contents i.e. print.
-    """
-    def __enter__(self):
-        self._stdout = sys.stdout
-        sys.stdout = self._stringio = io.StringIO()
-        return self
-
-    def __exit__(self, *args):
-        self.extend(self._stringio.getvalue().splitlines())
-        del self._stringio    # free up some memory
-        sys.stdout = self._stdout
-
-
-def clean_code(source):
-    codes = source.split('\n')
-    code_cleaned = filter(lambda code: not (code.startswith('import') or code.startswith('from')), codes)
-    return '\n'.join(code_cleaned)
-
-
 def get_arguments(request):
     """ Get arguments from the request.
     """
@@ -151,15 +86,6 @@ def get_arguments(request):
     return list(args), kwargs
 
 
-def get_modules(source):
-    modules = {'nest': nest}
-    for line in source.split('\n'):
-        code = line.split(' ')
-        if code[0] == 'import' and code[1] not in _blacklist_modules:
-            modules.update({code[-1]: importlib.import_module(code[1])})
-    return modules
-
-
 def get_or_error(func):
     """ Wrapper to get data and status.
     """
@@ -171,14 +97,21 @@ def get_or_error(func):
     return func_wrapper
 
 
-def SpikeTrain(arg):
+def to_spiketrain(arg):
     if isinstance(arg, (list,tuple)):
         try:
-            return elephant.statistics.SpikeTrain(*arg)
+            return neo.SpikeTrain(*arg)
         except:
             return np.array(arg)
     elif isinstance(arg, dict):
-        return elephant.statistics.SpikeTrain(**arg)
+        return neo.SpikeTrain(**arg)
+
+
+def to_analog_signal(arg):
+    if isinstance(arg, (list,tuple)):
+        return neo.AnalogSignal(*arg)
+    elif isinstance(arg, dict):
+        return neo.AnalogSignal(**arg)
 
 
 def serialize(call, args, kwargs):
@@ -187,18 +120,22 @@ def serialize(call, args, kwargs):
     paramKeys = list(inspect.signature(call).parameters.keys())
 
     for (idx, arg) in enumerate(args):
-        if paramKeys[idx] == 'spiketrain':
-            args[idx] = SpikeTrain(arg)
+        if paramKeys[idx] == 'signal':
+            args[idx] = to_analog_signal(arg)
+        elif paramKeys[idx] == 'spiketrain':
+            args[idx] = to_spiketrain(arg)
         elif paramKeys[idx] == 'spiketrains':
-            args[idx] = [SpikeTrain(a) for a in arg]
+            args[idx] = [to_spiketrain(a) for a in arg]
         elif paramKeys[idx] in ['binsize', 't_start', 't_stop']:
             args[idx] = arg['value'] * getattr(pq, arg['unit'])
 
     for (key, value) in kwargs.items():
+        if key == 'signal':
+            kwargs[key] = to_analog_signal(value)
         if key == 'spiketrain':
-            kwargs[key] = SpikeTrain(value)
+            kwargs[key] = to_spiketrain(value)
         elif key == 'spiketrains':
-            kwargs[key] = [SpikeTrain(v) for v in value]
+            kwargs[key] = [to_spiketrain(v) for v in value]
         elif key in ['binsize', 't_start', 't_stop']:
             kwargs[key] = value['value'] * getattr(pq, value['unit'])
     return args, kwargs

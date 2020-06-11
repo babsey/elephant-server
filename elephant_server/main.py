@@ -104,14 +104,16 @@ def to_spike_train(arg):
         except:
             return np.array(arg)
     elif isinstance(arg, dict):
-        return neo.SpikeTrain(**arg)
+        _, kwargs = serialize(neo.SpikeTrain, [], arg)
+        return neo.SpikeTrain(**kwargs)
 
 
 def to_analog_signal(arg):
     if isinstance(arg, (list,tuple)):
         return neo.AnalogSignal(*arg)
     elif isinstance(arg, dict):
-        return neo.AnalogSignal(**arg)
+        _, kwargs = serialize(neo.AnalogSignal, [], arg)
+        return neo.AnalogSignal(**kwargs)
 
 
 def serialize(call, args, kwargs):
@@ -126,8 +128,8 @@ def serialize(call, args, kwargs):
             args[idx] = to_spike_train(arg)
         elif paramKeys[idx] == 'spiketrains':
             args[idx] = [to_spike_train(a) for a in arg]
-        elif paramKeys[idx] in ['binsize', 't_start', 't_stop']:
-            args[idx] = arg['value'] * getattr(pq, arg['unit'])
+        elif paramKeys[idx] in ['binsize', 't_start', 't_stop', 'times'] and isinstance(value, dict):
+                args[idx] = arg['value'] * getattr(pq, arg['unit'])
 
     for (key, value) in kwargs.items():
         if key == 'signal':
@@ -136,8 +138,8 @@ def serialize(call, args, kwargs):
             kwargs[key] = to_spike_train(value)
         elif key == 'spiketrains':
             kwargs[key] = [to_spike_train(v) for v in value]
-        elif key in ['binsize', 't_start', 't_stop']:
-            kwargs[key] = value['value'] * getattr(pq, value['unit'])
+        elif key in ['binsize', 't_start', 't_stop', 'times'] and isinstance(value, dict):
+                kwargs[key] = value['value'] * getattr(pq, value['unit'])
     return args, kwargs
 
 

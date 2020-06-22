@@ -1,22 +1,18 @@
-import flask
-from flask import Flask, request, jsonify
-from flask_cors import CORS, cross_origin
-
 import inspect
-
-from werkzeug.exceptions import abort
-from werkzeug.wrappers import Response
+import importlib
 
 import elephant
 import neo
 import numpy as np
 import quantities as pq
-
+from flask import Flask, request, jsonify
+from flask_cors import CORS, cross_origin
+from werkzeug.exceptions import abort
+from werkzeug.wrappers import Response
 
 __all__ = [
     'app'
 ]
-
 
 app = Flask(__name__)
 CORS(app)
@@ -38,9 +34,11 @@ def route_api(module=''):
     """ Route to list call functions in Elephant or its module.
     """
     if module:
-        calls = dir(getattr(elephant, module))
+        module = importlib.import_module(f"elephant.{module}")
     else:
-        calls = dir(elephant)
+        module = elephant
+    # TODO: calls = module.__all__
+    calls = dir(module)
     calls = list(filter(lambda x: not x.startswith('_'), calls))
     calls.sort()
     return jsonify(calls)
@@ -52,7 +50,8 @@ def route_api_call(module, call):
     """ Route to call function in Elephant module.
     """
     args, kwargs = get_arguments(request)
-    call = getattr(getattr(elephant, module), call)
+    module = importlib.import_module(f"elephant.{module}")
+    call = getattr(module, call)
     response = api_client(call, args, kwargs)
     return jsonify(response)
 
@@ -89,16 +88,18 @@ def get_arguments(request):
 def get_or_error(func):
     """ Wrapper to get data and status.
     """
+
     def func_wrapper(call, args, kwargs):
         try:
             return func(call, args, kwargs)
         except Exception as e:
             abort(Response(str(e), 400))
+
     return func_wrapper
 
 
 def to_spike_train(arg):
-    if isinstance(arg, (list,tuple)):
+    if isinstance(arg, (list, tuple)):
         try:
             return neo.SpikeTrain(*arg)
         except:
@@ -109,7 +110,7 @@ def to_spike_train(arg):
 
 
 def to_analog_signal(arg):
-    if isinstance(arg, (list,tuple)):
+    if isinstance(arg, (list, tuple)):
         return neo.AnalogSignal(*arg)
     elif isinstance(arg, dict):
         _, kwargs = serialize(neo.AnalogSignal, [], arg)
@@ -128,8 +129,9 @@ def serialize(call, args, kwargs):
             args[idx] = to_spike_train(arg)
         elif paramKeys[idx] == 'spiketrains':
             args[idx] = [to_spike_train(a) for a in arg]
-        elif paramKeys[idx] in ['binsize', 't_start', 't_stop', 'times'] and isinstance(value, dict):
-                args[idx] = arg['value'] * getattr(pq, arg['unit'])
+        elif paramKeys[idx] in ['binsize', 't_start', 't_stop',
+                                'times'] and isinstance(arg, dict):
+            args[idx] = arg['value'] * getattr(pq, arg['unit'])
 
     for (key, value) in kwargs.items():
         if key == 'signal':
@@ -138,8 +140,9 @@ def serialize(call, args, kwargs):
             kwargs[key] = to_spike_train(value)
         elif key == 'spiketrains':
             kwargs[key] = [to_spike_train(v) for v in value]
-        elif key in ['binsize', 't_start', 't_stop', 'times'] and isinstance(value, dict):
-                kwargs[key] = value['value'] * getattr(pq, value['unit'])
+        elif key in ['binsize', 't_start', 't_stop', 'times'] and isinstance(
+                value, dict):
+            kwargs[key] = value['value'] * getattr(pq, value['unit'])
     return args, kwargs
 
 

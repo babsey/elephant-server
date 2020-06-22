@@ -14,7 +14,7 @@ For more information of the Elephant: https://github.com/NeuralEnsemble/elephant
 Clone working copy from github repository.
 
 ```
-git clone https://github.com/babsey/elephant-server
+git clone https://github.com/INM-6/elephant-server
 cd elephant-server
 ```
 

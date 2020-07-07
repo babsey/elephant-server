@@ -1,14 +1,13 @@
-import inspect
 import importlib
+from functools import wraps
+from http import HTTPStatus
 
 import elephant
-import neo
-import numpy as np
-import quantities as pq
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, abort
 from flask_cors import CORS, cross_origin
-from werkzeug.exceptions import abort
-from werkzeug.wrappers import Response
+
+from elephant_server.serialize import deserialize, serialize, Units
+from elephant_server.exceptions import *
 
 __all__ = [
     'app'
@@ -44,124 +43,83 @@ def route_api(module=''):
     return jsonify(calls)
 
 
+def on_error_handler(func):
+    """
+    Elephant-related errors handler.
+    For Flask internal errors, `@app.errorhandler(<code>)` should be used.
+    """
+    @wraps(func)
+    def func_wrapped(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except ElephantError as error:
+            return abort(HTTPStatus.BAD_REQUEST, description=repr(error))
+        except Exception as error:
+            return abort(HTTPStatus.INTERNAL_SERVER_ERROR,
+                         description=repr(error))
+
+    return func_wrapped
+
+
 @app.route('/api/<module>/<call>', methods=['GET', 'POST'])
 @cross_origin()
+@on_error_handler
 def route_api_call(module, call):
     """ Route to call function in Elephant module.
     """
-    args, kwargs = get_arguments(request)
-    module = importlib.import_module(f"elephant.{module}")
-    call = getattr(module, call)
-    response = api_client(call, args, kwargs)
+    # We don't allow storing the main payload in request.args (the part in the
+    # URL after the question mark), which may serve useful in the future as
+    # custom flag options.
+    # We also don't consider request.files and request.form
+    # Flask.request object explained:
+    #   https://stackoverflow.com/a/16664376/2840134
+    # TODO Q: Do clients (NEST D., Insite) send forms?
+
+    # get function
+    try:
+        module = importlib.import_module(f"elephant.{module}")
+        call = getattr(module, call)
+    except (ModuleNotFoundError, AttributeError) as error:
+        raise InvalidRequest(repr(error))
+
+    # get function kwargs
+    json_data = request.get_json()
+    try:
+        units_dict = json_data.get("units", {})
+        units = Units(**units_dict)
+        call_dict = deserialize(json_data)
+    except Exception as error:
+        raise DeserializeError(repr(error))
+
+    # compute the result
+    try:
+        result = call(**call_dict)
+    except Exception as error:
+        raise ElephantRuntimeError(repr(error))
+
+    # serialize to lists and dicts
+    try:
+        response = serialize(result, units=units)
+    except Exception as error:
+        raise SerializeError(repr(error))
+
     return jsonify(response)
-
-
-# ----------------------
-# Helpers for the server
-# ----------------------
-
-def get_arguments(request):
-    """ Get arguments from the request.
-    """
-    args, kwargs = [], {}
-    if request.is_json:
-        json = request.get_json()
-        if isinstance(json, list):
-            args = json
-        elif isinstance(json, dict):
-            kwargs = json
-            if 'args' in kwargs:
-                args = kwargs.pop('args')
-    elif len(request.form) > 0:
-        if 'args' in request.form:
-            args = request.form.getlist('args')
-        else:
-            kwargs = request.form.to_dict()
-    elif len(request.args) > 0:
-        if 'args' in request.args:
-            args = request.args.getlist('args')
-        else:
-            kwargs = request.args.to_dict()
-    return list(args), kwargs
-
-
-def get_or_error(func):
-    """ Wrapper to get data and status.
-    """
-
-    def func_wrapper(call, args, kwargs):
-        try:
-            return func(call, args, kwargs)
-        except Exception as e:
-            abort(Response(str(e), 400))
-
-    return func_wrapper
-
-
-def to_spike_train(arg):
-    if isinstance(arg, (list, tuple)):
-        try:
-            return neo.SpikeTrain(*arg)
-        except:
-            return np.array(arg)
-    elif isinstance(arg, dict):
-        _, kwargs = serialize(neo.SpikeTrain, [], arg)
-        return neo.SpikeTrain(**kwargs)
-
-
-def to_analog_signal(arg):
-    if isinstance(arg, (list, tuple)):
-        return neo.AnalogSignal(*arg)
-    elif isinstance(arg, dict):
-        _, kwargs = serialize(neo.AnalogSignal, [], arg)
-        return neo.AnalogSignal(**kwargs)
-
-
-def serialize(call, args, kwargs):
-    """ Serialize arguments with keywords for call functions in Elephant.
-    """
-    paramKeys = list(inspect.signature(call).parameters.keys())
-
-    for (idx, arg) in enumerate(args):
-        if paramKeys[idx] == 'signal':
-            args[idx] = to_analog_signal(arg)
-        elif paramKeys[idx] == 'spiketrain':
-            args[idx] = to_spike_train(arg)
-        elif paramKeys[idx] == 'spiketrains':
-            args[idx] = [to_spike_train(a) for a in arg]
-        elif paramKeys[idx] in ['binsize', 't_start', 't_stop',
-                                'times'] and isinstance(arg, dict):
-            args[idx] = arg['value'] * getattr(pq, arg['unit'])
-
-    for (key, value) in kwargs.items():
-        if key == 'signal':
-            kwargs[key] = to_analog_signal(value)
-        if key == 'spiketrain':
-            kwargs[key] = to_spike_train(value)
-        elif key == 'spiketrains':
-            kwargs[key] = [to_spike_train(v) for v in value]
-        elif key in ['binsize', 't_start', 't_stop', 'times'] and isinstance(
-                value, dict):
-            kwargs[key] = value['value'] * getattr(pq, value['unit'])
-    return args, kwargs
-
-
-@get_or_error
-def api_client(call, args, kwargs):
-    """ API Client to call function in Elephant.
-    """
-    if callable(call):
-        if 'inspect' in kwargs:
-            response = {
-                'data': getattr(inspect, kwargs['inspect'])(call)
-            }
-        else:
-            args, kwargs = serialize(call, args, kwargs)
-            response = call(*args, **kwargs).data.tolist()
-    else:
-        response = call
-    return response
 
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
+    # request params example
+    # >>> dict(kwargs=dict(spiketrain=[1, 1.5, 2.7], bin_size=3, t_start=0), units=('ms', 'mV'))
+    # {'data': {'bin_size': 3,
+    #             'spiketrain': [1, 1.5, 2.7],
+    #             't_start': 0,
+    #  'units': {'time': 'ms', 'volt': 'mV'}
+    #  'chunk_id' : 2
+    #  }
+    # *signal[s]
+    # *spiketrain[s]
+    # *units
+    # *bin_size
+    # *t_start
+    # *t_stop
+

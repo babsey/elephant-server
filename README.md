@@ -50,7 +50,7 @@ Using curl in bash
 curl localhost:5000/api/<module>/<call>
 ```
 
-E.g. To see a list of calls in statistucs module
+E.g. To see a list of calls in statistics module
 ```
 curl localhost:5000/api/statistics
 ```

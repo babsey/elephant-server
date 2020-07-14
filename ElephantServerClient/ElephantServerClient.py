@@ -1,4 +1,3 @@
-import os
 import requests
 from werkzeug.exceptions import BadRequest
 
@@ -24,8 +23,8 @@ class ElephantClientAPI(object):
         self.headers = {'Content-type': 'application/json', 'Accept': 'text/plain'}
 
     def _elephant_api_call(self, call, params={}):
-        hostname = 'http://{}:{}/api'.format(self.host, self.port)
-        url = os.path.join(hostname, self.module, call)
+        hostname = f"http://{self.host}:{self.port}/api"
+        url = '/'.join([hostname, self.module, call])
         response = requests.post(url, json=params, headers=self.headers)
         return encode(response)
 

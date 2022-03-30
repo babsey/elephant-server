@@ -8,4 +8,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY ./elephant_server ./elephant_server
 
 EXPOSE 5000
-CMD [ "python", "/usr/src/app/elephant_server/main.py" ]
+CMD [ "gunicorn", "elephant_server:app", "--bind 0.0.0.0:5000" ]

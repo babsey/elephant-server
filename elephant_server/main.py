@@ -1,13 +1,20 @@
-import importlib
+#!/usr/bin/env python3
+
 from functools import wraps
 from http import HTTPStatus
+import importlib
+import os
 
 import elephant
 from flask import Flask, request, jsonify, abort
 from flask_cors import CORS, cross_origin
 
-from elephant_server.serialize import deserialize, serialize, Units
-from elephant_server.exceptions import *
+# local imports
+from .serialize import deserialize, serialize, Units
+from .exceptions import *
+
+HOST = os.environ.get('ELEPHANT_SERVER_HOST', '127.0.0.1')
+PORT = os.environ.get('ELEPHANT_SERVER_PORT', '5000')
 
 __all__ = [
     'app'
@@ -75,14 +82,14 @@ def route_api_call(module, call):
     #   https://stackoverflow.com/a/16664376/2840134
     # TODO Q: Do clients (NEST D., Insite) send forms?
 
-    # get function
+    # get module function
     try:
         module = importlib.import_module(f"elephant.{module}")
         call = getattr(module, call)
     except (ModuleNotFoundError, AttributeError) as error:
         raise InvalidRequest(repr(error))
 
-    # get function kwargs
+    # deserialize request data
     json_data = request.get_json()
     try:
         units_dict = json_data.get("units", {})
@@ -91,13 +98,16 @@ def route_api_call(module, call):
     except Exception as error:
         raise DeserializeError(repr(error))
 
-    # compute the result
+    # compute request
     try:
-        result = call(**call_dict)
+        if 'spiketrain' in call.__code__.co_varnames and 'spiketrains' in call_dict.keys():
+            result = [call(spiketrain) for spiketrain in call_dict['spiketrains']]
+        else:
+            result = call(**call_dict)
     except Exception as error:
         raise ElephantRuntimeError(repr(error))
 
-    # serialize to lists and dicts
+    # serialize result to lists and dicts for JSON
     try:
         response = serialize(result, units=units)
     except Exception as error:
@@ -107,19 +117,4 @@ def route_api_call(module, call):
 
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5000)
-    # request params example
-    # >>> dict(kwargs=dict(spiketrain=[1, 1.5, 2.7], bin_size=3, t_start=0), units=('ms', 'mV'))
-    # {'data': {'bin_size': 3,
-    #             'spiketrain': [1, 1.5, 2.7],
-    #             't_start': 0,
-    #  'units': {'time': 'ms', 'volt': 'mV'}
-    #  'chunk_id' : 2
-    #  }
-    # *signal[s]
-    # *spiketrain[s]
-    # *units
-    # *bin_size
-    # *t_start
-    # *t_stop
-
+    app.run(host=HOST, port=PORT)

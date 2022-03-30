@@ -3,6 +3,7 @@ import quantities as pq
 
 
 class Units:
+
     def __init__(self, time="ms", amplitude="mV", rate="Hz"):
         self.time = pq.Quantity(1, units=time)
         self.amplitude = pq.Quantity(1, units=amplitude)
@@ -49,7 +50,7 @@ class Deserializer:
                         sampling_rate=self.sampling_rate, t_start=self.t_start)
         else:
             data = data.copy()
-            data.setdefault('units', self.units.amplitude)
+            # data.setdefault('units', self.units.amplitude)
             data.setdefault('sampling_rate', self.sampling_rate)
         return neo.AnalogSignal(**data)
 
@@ -68,11 +69,12 @@ def serialize(result, units: Units):
                           t_start=serialize(result.t_start, units=units))
         return dict(spiketrain=spiketrain)
     if isinstance(result, neo.AnalogSignal):
-        signal = dict(signal=serialize(result.signal, units=units),
-                      units=units.amplitude,
-                      sampling_rate=serialize(result.sampling_rate,
-                                              units=units),
-                      t_start=serialize(result.t_start, units=units))
+        signal = dict(values=serialize(result.T.as_array().tolist(), units=units),
+                      times=serialize(result.times, units=units),
+                      sampling_rate=serialize(result.sampling_rate, units=units))
+        units = f"{result.dimensionality}"
+        if units != 'dimensionless':
+            signal['units'] = units
         return dict(signal=signal)
     if isinstance(result, pq.Quantity):
         return units.rescale(result).data.tolist()
@@ -102,7 +104,7 @@ def deserialize(json_data: dict):
             data_neo[key] = converter.to_spiketrain(value)
         elif key == 'spiketrains':
             data_neo[key] = converter.to_spiketrains(value)
-        elif key in ['binsize', 't_start', 't_stop', 'times']:
+        elif key in ['bin_size', 't_start', 't_stop', 'times']:
             # time related units
             data_neo[key] = pq.Quantity(value, units=units.time)
         else:

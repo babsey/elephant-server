@@ -26,13 +26,13 @@ pip3 install -r requirements.txt
 Start with Gunicorn
 
 ```
-gunicorn elephant_server:app --bind 0.0.0.0:5000
+gunicorn elephant_server:app --bind 0.0.0.0:52428
 ```
 
 Or start with Docker
 
 ```
-docker run -i -p 5000:5000 -t elephant-server
+docker run --rm -it -p 52428:52428 elephant-server
 ```
 
 ### Demo

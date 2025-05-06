@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = {file = "LICENSE"}
 authors = [
-  {name = "Sebastian Spreizer", email = "spreizer@web.de"},
+  {name = "Sebastian Spreizer"},
 ]
 maintainers = [
   {name = "Sebastian Spreizer", email = "spreizer@web.de"},

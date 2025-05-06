@@ -1,12 +1,16 @@
 [project]
 name = "elephant-server"
+version = "0.1.0a3"
 description = "A server instance for Elephant"
-license = { file = "LICENSE" }
+readme = "README.md"
+requires-python = ">=3.9"
+license = {file = "LICENSE"}
 authors = [
   {name = "Sebastian Spreizer", email = "spreizer@web.de"},
 ]
-readme = "README.md"
-requires-python = ">=3.8"
+maintainers = [
+  {name = "Sebastian Spreizer", email = "spreizer@web.de"},
+]
 # keywords = ["analysis toolkit", "electro-physiology", "neuroscience"]
 classifiers = [
   # How mature is this project? Common values are
@@ -26,16 +30,40 @@ classifiers = [
   # Specify the Python versions you support here.
   "Programming Language :: Python :: 3",
 ]
-dynamic = ["dependencies", "version"]
+dynamic = ["dependencies"]
 
 [project.urls]
 repository = "https://github.com/babsey/elephant-server"
 documentation = "https://elephant.readthedocs.io"
 
 [tool.setuptools]
-package-dir = {"elephant_server" = "src"}
 script-files = ["scripts/elephant-server"]
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
-version = {attr = "src.__version__"}
+
+[tool.black]
+line-length = 120
+
+[tool.flake8]
+# This is ignored
+# see discussions around https://github.com/PyCQA/flake8/issues/234
+
+[tool.isort]
+atomic = true
+line_length = 120
+multi_line_output = 3
+profile = "black"
+skip_gitignore = true
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "--mypy --pylint --pydocstyle --cov --ignore=conda --ignore=venv --ignore=.git --ignore=__pycache__"
+norecursedirs = ".git _build venv tmp*"
+
+[tool.mypy]
+exclude = ".git/, .pytest_cache/, conda/, venv/"
+
+[tool.pydocstyle]
+convention = "numpy"
+add-ignore = "D300"

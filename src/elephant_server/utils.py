@@ -11,7 +11,18 @@ import time
 
 import RestrictedPython
 
-MODULES = os.environ.get("ELEPHANT_SERVER_MODULES", "import numpy as np; import elephant; import neo")
+MODULES = os.environ.get(
+    "ELEPHANT_SERVER_MODULES",
+    ";".join(
+        [
+            "import numpy as np",
+            "import elephant",
+            "import neo",
+            "import quantities as pq",
+            "import pandas as pd",
+        ]
+    ),
+)
 
 
 class Capturing(list):
@@ -29,7 +40,7 @@ class Capturing(list):
 
 
 def clean_code(source):
-    codes = re.split('\n|; ', source)
+    codes = re.split("\n|; ", source)
     codes_cleaned = []  # noqa
     for code in codes:
         if code.startswith("import") or code.startswith("from"):
@@ -75,7 +86,9 @@ def get_modules_from_env():
     try:
         parsed = ast.iter_child_nodes(ast.parse(MODULES))
     except (SyntaxError, ValueError):
-        raise SyntaxError("The Elephant server module environment variables contains syntax errors.")
+        raise SyntaxError(
+            "The Elephant server module environment variables contains syntax errors."
+        )
     for node in parsed:
         if isinstance(node, ast.Import):
             for alias in node.names:

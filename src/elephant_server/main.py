@@ -1,27 +1,25 @@
 #!/usr/bin/env python3
 # main.py
 
-import os
+import os # noqa
 
-from fastapi import FastAPI, Request, status
-from fastapi.encoders import jsonable_encoder
-from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from fastapi import FastAPI, Request, status # noqa
+from fastapi.encoders import jsonable_encoder # noqa
+from fastapi.responses import JSONResponse # noqa
+from fastapi.middleware.cors import CORSMiddleware # noqa
+from pydantic import BaseModel # noqa
 
 import elephant
 
 # local imports
 from .exceptions import ErrorHandler
 from .helpers import do_api_call, do_exec, do_list_calls
-from .utils import get_arguments
+from .utils import get_modules_from_env
 
-HOST = os.environ.get('ELEPHANT_SERVER_HOST', '127.0.0.1')
-PORT = os.environ.get('ELEPHANT_SERVER_PORT', '5001')
+HOST = os.environ.get("ELEPHANT_SERVER_HOST", "127.0.0.1")
+PORT = os.environ.get("ELEPHANT_SERVER_PORT", "52428")
 
-__all__ = [
-    'app'
-]
+__all__ = ["app"]
 
 app = FastAPI()
 
@@ -42,42 +40,42 @@ async def validation_exception_handler(request: Request, exc: ErrorHandler):
     )
 
 
-@app.get('/')
+@app.get("/")
 def index():
-    return {'elephant': elephant.__version__}
+    return {"elephant": elephant.__version__}
 
 
-@app.get('/api')
-@app.get('/api/{module}')
-def route_api(module=''):
-    """ Route to list call functions in Elephant or its module.
-    """
+@app.get("/api")
+@app.get("/api/{module}")
+def route_api(module=""):
+    """Route to list call functions in Elephant or its module."""
 
     calls = do_list_calls(module)
     return calls
+
 
 class JSONData(BaseModel):
     args: list
     kwargs: dict
 
 
-@app.get('/api/{module}/{call}')
-@app.post('/api/{module}/{call}')
-def route_api_call(module, call, json_data:JSONData):
-    """ Route to call function in Elephant module.
-    """
+@app.get("/api/{module}/{call}")
+@app.post("/api/{module}/{call}")
+def route_api_call(module, call, json_data: JSONData):
+    """Route to call function in Elephant module."""
 
     response = do_api_call(module, call, json_data)
     return response
+
 
 class Data(BaseModel):
     response_keys: str | list = "response"
     source: str = ""
 
+
 @app.post("/exec")
 def route_exec(data: Data):
-    """Route to execute script in Python.
-    """
+    """Route to execute script in Python."""
 
     response = do_exec(data)
     return response

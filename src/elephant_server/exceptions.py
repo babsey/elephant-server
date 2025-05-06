@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # exceptions.py
 
-import traceback
-import sys
+import traceback # noqa
+import sys # noqa
 
 from .logger import logger
 

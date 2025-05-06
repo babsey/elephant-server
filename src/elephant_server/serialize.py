@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 # serialize.py
 
-import neo
-import quantities as pq
-import numpy as np
+import neo # noqa
+import quantities as pq # noqa
+import numpy as np # noqa
 
 from .exceptions import call_or_error
 from .logger import logger
@@ -32,8 +32,7 @@ class Units:
 
 class Deserializer:
 
-    def __init__(self, units: Units, t_start=None, t_stop=None,
-                 sampling_rate=None):
+    def __init__(self, units: Units, t_start=None, t_stop=None, sampling_rate=None):
         self.units = units
         self.t_start = t_start
         self.t_stop = t_stop
@@ -47,18 +46,26 @@ class Deserializer:
 
     def to_spiketrain(self, data):
         if not isinstance(data, dict):
-            data = dict(times=data, units=self.units.time, t_stop=self.t_stop,
-                        t_start=self.t_start)
+            data = dict(
+                times=data,
+                units=self.units.time,
+                t_stop=self.t_stop,
+                t_start=self.t_start,
+            )
         return neo.SpikeTrain(**data)
 
     def to_analog_signal(self, data):
         if not isinstance(data, dict):
-            data = dict(signal=data, units=self.units.amplitude,
-                        sampling_rate=self.sampling_rate, t_start=self.t_start)
+            data = dict(
+                signal=data,
+                units=self.units.amplitude,
+                sampling_rate=self.sampling_rate,
+                t_start=self.t_start,
+            )
         else:
             data = data.copy()
             # data.setdefault('units', self.units.amplitude)
-            data.setdefault('sampling_rate', self.sampling_rate)
+            data.setdefault("sampling_rate", self.sampling_rate)
         return neo.AnalogSignal(**data)
 
 
@@ -73,20 +80,19 @@ def deserialize_data(json_data: dict):
     t_start = json_data.get("t_start", 0) * units.time
     t_stop = json_data.get("t_stop")
     sampling_rate = json_data.get("sampling_rate")
-    converter = Deserializer(units=units, t_start=t_start, t_stop=t_stop,
-                             sampling_rate=sampling_rate)
+    converter = Deserializer(units=units, t_start=t_start, t_stop=t_stop, sampling_rate=sampling_rate)
 
     data_neo = {}
     for key, value in data_payload.items():
-        if key == 'signal':
+        if key == "signal":
             data_neo[key] = converter.to_analog_signal(value)
-        elif key == 'signals':
+        elif key == "signals":
             data_neo[key] = converter.to_analog_signals(value)
-        if key == 'spiketrain':
+        if key == "spiketrain":
             data_neo[key] = converter.to_spiketrain(value)
-        elif key == 'spiketrains':
+        elif key == "spiketrains":
             data_neo[key] = converter.to_spiketrains(value)
-        elif key in ['bin_size', 't_start', 't_stop', 'times']:
+        elif key in ["bin_size", "t_start", "t_stop", "times"]:
             # time related units
             data_neo[key] = pq.Quantity(value, units=units.time)
         else:
@@ -97,7 +103,7 @@ def deserialize_data(json_data: dict):
 
 @call_or_error
 def serialize_data(data, units: Units = None):
-    logger.debug(f"Serialize data: {data}")
+    # logger.debug(f"Serialize data: {data}")
     if isinstance(data, dict):
         return {key: serialize_data(value, units=units) for key, value in data.items()}
     elif isinstance(data, (list, tuple)):
@@ -107,18 +113,22 @@ def serialize_data(data, units: Units = None):
     elif isinstance(data, np.ndarray):
         return data.tolist()
     elif isinstance(data, neo.SpikeTrain):
-        spiketrain = dict(times=serialize_data(data.times, units=units),
-                          units=units.time,
-                          t_stop=serialize_data(data.t_stop, units=units),
-                          t_start=serialize_data(data.t_start, units=units))
+        spiketrain = dict(
+            times=serialize_data(data.times, units=units),
+            units=units.time,
+            t_stop=serialize_data(data.t_stop, units=units),
+            t_start=serialize_data(data.t_start, units=units),
+        )
         return dict(spiketrain=spiketrain)
     elif isinstance(data, neo.AnalogSignal):
-        signal = dict(values=serialize_data(data.T.as_array().tolist(), units=units),
-                      times=serialize_data(data.times, units=units),
-                      sampling_rate=serialize_data(data.sampling_rate, units=units))
+        signal = dict(
+            values=serialize_data(data.T.as_array().tolist(), units=units),
+            times=serialize_data(data.times, units=units),
+            sampling_rate=serialize_data(data.sampling_rate, units=units),
+        )
         units = f"{data.dimensionality}"
-        if units != 'dimensionless':
-            signal['units'] = units
+        if units != "dimensionless":
+            signal["units"] = units
         return dict(signal=signal)
     elif isinstance(data, pq.Quantity):
         return units.rescale(data).data.tolist()

@@ -1,15 +1,21 @@
 #!/usr/bin/env python
 # helpers.py
 
-import RestrictedPython
-import importlib
+import RestrictedPython # noqa
+import importlib # noqa
 
-import elephant
+import elephant # noqa
 
 from .exceptions import call_or_error
 from .logger import logger
 from .serialize import Units, deserialize_data, serialize_data
-from .utils import Capturing, clean_code, get_boolean_environ, get_modules_from_env, get_restricted_globals
+from .utils import (
+    Capturing,
+    clean_code,
+    get_boolean_environ,
+    get_modules_from_env,
+    get_restricted_globals,
+)
 
 
 RESTRICTION_DISABLED = get_boolean_environ("ELEPHANT_SERVER_DISABLE_RESTRICTION")
@@ -20,7 +26,7 @@ if RESTRICTION_DISABLED:
 
 
 def do_api_call(module, call, json_data):
-    logger.debug('Do api call')
+    logger.debug("Do api call")
     # get module function
     call = do_get_function(module, call)
 
@@ -30,14 +36,15 @@ def do_api_call(module, call, json_data):
     call_dict = deserialize_data(json_data)
 
     # compute request
-    if 'spiketrain' in call.__code__.co_varnames and 'spiketrains' in call_dict.keys():
-        data = [call_or_error(call)(spiketrain) for spiketrain in call_dict['spiketrains']]
+    if "spiketrain" in call.__code__.co_varnames and "spiketrains" in call_dict.keys():
+        data = [call_or_error(call)(spiketrain) for spiketrain in call_dict["spiketrains"]]
     else:
         data = call_or_error(call)(**call_dict)
 
     # serialize data to lists and dicts for JSON
     response = serialize_data(data, units=units)
     return response
+
 
 def do_exec(request):
     logger.debug('Do exec')
@@ -77,6 +84,7 @@ def do_get_function(module, call):
     module = importlib.import_module(f"elephant.{module}")
     return getattr(module, call)
 
+
 def do_list_calls(module):
     if module:
         module = importlib.import_module(f"elephant.{module}")
@@ -84,7 +92,7 @@ def do_list_calls(module):
         module = elephant
     # TODO: calls = module.__all__
     calls = dir(module)
-    calls = list(filter(lambda x: not x.startswith('_'), calls))
+    calls = list(filter(lambda x: not x.startswith("_"), calls))
     calls.sort()
 
     return calls

@@ -1,10 +1,14 @@
+[build-system]
+requires = ["setuptools >= 77.0.3"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "elephant-server"
 version = "0.1.0a3"
 description = "A server instance for Elephant"
 readme = "README.md"
 requires-python = ">=3.9"
-license = {file = "LICENSE"}
+license-files = ["LICENSE"]
 authors = [
   {name = "Sebastian Spreizer"},
 ]
